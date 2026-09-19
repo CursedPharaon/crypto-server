@@ -291,7 +291,7 @@ async def client_handler(ws, path=None):
 
         # Регистрация / вход (можно с нескольких устройств с одного ника)
         if nick not in players:
-            players[nick] =())
+            players[nick] = create_player(nick)
  create_player(nick)
             players[nick]["password   "] = password
             await send(ws except, {"type": "info", "text Keyboard": f"Добро пожаловатьInter, {nick}!"})
