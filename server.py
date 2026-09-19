@@ -46,6 +46,7 @@ def create_player(nick):
         "plr_gpu": [],
         "plr_bus": [],
         "mining_active": False,
+        "mine_counter": 0,
         "is_admin": (nick == ADMIN_NICK),
     }
 
@@ -63,7 +64,7 @@ async def broadcast(msg):
 
 
 async def send_online_list():
-    nicks = list(online.values())
+    nicks = list(set(online.values()))
     await broadcast({"type": "online", "players": nicks})
 
 
@@ -81,10 +82,26 @@ def get_bus_income(p):
     return income
 
 
+def get_hashrate(p):
+    hr = 0
+    if p["plr_cpu"] == "celeron":
+        hr += 1
+    elif p["plr_cpu"] == "pentium":
+        hr += 3
+    elif p["plr_cpu"] == "core i3":
+        hr += 6
+    hr += 5 * p["plr_gpu"].count("gt 710")
+    hr += 12 * p["plr_gpu"].count("gtx 1050")
+    hr += 30 * p["plr_gpu"].count("gtx 1660")
+    return hr
+
+
 async def tick_loop():
+    """Раз в секунду: доход с бизнесов + майнинг."""
     while True:
         await asyncio.sleep(1)
         for nick, p in players.items():
+            # --- Бизнесы ---
             income = get_bus_income(p)
             if income > 0:
                 p["dollars"] += income
@@ -93,6 +110,25 @@ async def tick_loop():
                     p["exp"] -= p["max_exp"]
                     p["level"] += 1
                     p["max_exp"] = int(p["max_exp"] * 1.15)
+
+            # --- Майнинг ---
+            if p["mining_active"] and p["plr_cpu"] and p["plr_mat"] and p["plr_gpu"]:
+                p["mine_counter"] += 1
+                if p["mine_counter"] >= 12:  # каждые 12 сек
+                    p["mine_counter"] = 0
+                    hr = get_hashrate(p)
+                    chance = hr / (hr + 100) * 100
+                    if random.randint(1, 100) <= chance:
+                        p["btc"] += 0.01
+                        p["exp"] += random.randint(5, 10)
+                        while p["exp"] >= p["max_exp"]:
+                            p["exp"] -= p["max_exp"]
+                            p["level"] += 1
+                            p["max_exp"] = int(p["max_exp"] * 1.15)
+                        # уведомить игрока
+                        for w, n in list(online.items()):
+                            if n == nick:
+                                await send(w, {"type": "info", "text": f"⛏️ Блок найден! +0.01 BTC (итого {p['btc']:.4f})"})
 
 
 async def save_loop():
@@ -115,7 +151,7 @@ async def handle_command(ws, nick, data):
             await broadcast(msg)
 
     elif cmd == "online":
-        await send(ws, {"type": "online", "players": list(online.values())})
+        await send(ws, {"type": "online", "players": list(set(online.values()))})
 
     elif cmd == "state":
         await send(ws, {"type": "state", "data": p})
@@ -123,6 +159,7 @@ async def handle_command(ws, nick, data):
     elif cmd == "mine_on":
         if p["plr_cpu"] and p["plr_mat"] and p["plr_gpu"]:
             p["mining_active"] = True
+            p["mine_counter"] = 0
             await send(ws, {"type": "info", "text": "Майнинг запущен"})
         else:
             await send(ws, {"type": "error", "text": "Сначала соберите риг"})
@@ -130,6 +167,20 @@ async def handle_command(ws, nick, data):
     elif cmd == "mine_off":
         p["mining_active"] = False
         await send(ws, {"type": "info", "text": "Майнинг остановлен"})
+
+    elif cmd == "sell":
+        try:
+            amount = float(data.get("amount", 0))
+        except Exception:
+            amount = 0
+        if amount <= 0 or p["btc"] < amount:
+            await send(ws, {"type": "error", "text": "Недостаточно BTC"})
+        else:
+            price = 30000
+            earned = int(amount * price)
+            p["btc"] -= amount
+            p["dollars"] += earned
+            await send(ws, {"type": "info", "text": f"Продано {amount} BTC за {earned}$"})
 
     elif cmd == "give":
         target = str(data.get("to", "")).strip()
@@ -238,16 +289,14 @@ async def client_handler(ws, path=None):
             await send(ws, {"type": "error", "text": "Пустой ник"})
             return
 
-        if nick in online.values():
-            await send(ws, {"type": "error", "text": "Ник уже онлайн"})
-            return
-
+        # Регистрация / вход (можно с нескольких устройств с одного ника)
         if nick not in players:
-            players[nick] = create_player(nick)
-            players[nick]["password"] = password
-            await send(ws, {"type": "info", "text": f"Добро пожаловать, {nick}!"})
+            players[nick] =())
+ create_player(nick)
+            players[nick]["password   "] = password
+            await send(ws except, {"type": "info", "text Keyboard": f"Добро пожаловатьInter, {nick}!"})
         else:
-            if players[nick]["password"] and players[nick]["password"] != password:
+rupt            if players[nick]["password"] and players[nick]["password"] != password:
                 await send(ws, {"type": "error", "text": "Неверный пароль"})
                 return
             await send(ws, {"type": "info", "text": f"С возвращением, {nick}!"})
@@ -275,7 +324,10 @@ async def client_handler(ws, path=None):
             del online[ws]
         if nick:
             print(f"[СЕРВЕР] {nick} отключился")
-            await send_online_list()
+            try:
+                await send_online_list()
+            except Exception:
+                pass
 
 
 async def main():
@@ -292,8 +344,7 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
+        asyncio.run(main:
         print("\n[СЕРВЕР] Сохранение...")
         save_players()
         print("[СЕРВЕР] Выход.")
