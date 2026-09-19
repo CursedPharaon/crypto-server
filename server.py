@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 import random
-import time
 import websockets
 
 SAVE_FILE = "save.json"
@@ -97,11 +96,9 @@ def get_hashrate(p):
 
 
 async def tick_loop():
-    """Раз в секунду: доход с бизнесов + майнинг."""
     while True:
         await asyncio.sleep(1)
         for nick, p in players.items():
-            # --- Бизнесы ---
             income = get_bus_income(p)
             if income > 0:
                 p["dollars"] += income
@@ -111,10 +108,9 @@ async def tick_loop():
                     p["level"] += 1
                     p["max_exp"] = int(p["max_exp"] * 1.15)
 
-            # --- Майнинг ---
             if p["mining_active"] and p["plr_cpu"] and p["plr_mat"] and p["plr_gpu"]:
                 p["mine_counter"] += 1
-                if p["mine_counter"] >= 12:  # каждые 12 сек
+                if p["mine_counter"] >= 12:
                     p["mine_counter"] = 0
                     hr = get_hashrate(p)
                     chance = hr / (hr + 100) * 100
@@ -125,7 +121,6 @@ async def tick_loop():
                             p["exp"] -= p["max_exp"]
                             p["level"] += 1
                             p["max_exp"] = int(p["max_exp"] * 1.15)
-                        # уведомить игрока
                         for w, n in list(online.items()):
                             if n == nick:
                                 await send(w, {"type": "info", "text": f"⛏️ Блок найден! +0.01 BTC (итого {p['btc']:.4f})"})
@@ -289,14 +284,12 @@ async def client_handler(ws, path=None):
             await send(ws, {"type": "error", "text": "Пустой ник"})
             return
 
-        # Регистрация / вход (можно с нескольких устройств с одного ника)
         if nick not in players:
             players[nick] = create_player(nick)
- create_player(nick)
-            players[nick]["password   "] = password
-            await send(ws except, {"type": "info", "text Keyboard": f"Добро пожаловатьInter, {nick}!"})
+            players[nick]["password"] = password
+            await send(ws, {"type": "info", "text": f"Добро пожаловать, {nick}!"})
         else:
-rupt            if players[nick]["password"] and players[nick]["password"] != password:
+            if players[nick]["password"] and players[nick]["password"] != password:
                 await send(ws, {"type": "error", "text": "Неверный пароль"})
                 return
             await send(ws, {"type": "info", "text": f"С возвращением, {nick}!"})
@@ -344,7 +337,8 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main:
+        asyncio.run(main())
+    except KeyboardInterrupt:
         print("\n[СЕРВЕР] Сохранение...")
         save_players()
         print("[СЕРВЕР] Выход.")
